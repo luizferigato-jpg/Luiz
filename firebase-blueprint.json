@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "Stock": {
+      "title": "Stock Unit",
+      "description": "A physical or logical location for inventory",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the stock unit" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["name", "createdAt", "createdBy"]
+    },
+    "Part": {
+      "title": "Part",
+      "description": "An item in the inventory",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the part" },
+        "model": { "type": "string", "description": "Model or reference of the part" },
+        "quantity": { "type": "number", "description": "Current quantity in stock" },
+        "unitPrice": { "type": "number", "description": "Price per unit" },
+        "totalValue": { "type": "number", "description": "Total value (quantity * unitPrice)" },
+        "stockId": { "type": "string", "description": "ID of the stock unit this part belongs to" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" },
+        "createdBy": { "type": "string", "description": "UID of the user who created/last updated" }
+      },
+      "required": ["name", "model", "quantity", "unitPrice", "totalValue", "stockId", "updatedAt", "createdBy"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A record of entry or exit of a part",
+      "type": "object",
+      "properties": {
+        "partId": { "type": "string", "description": "ID of the part" },
+        "partName": { "type": "string", "description": "Name of the part at the time of transaction" },
+        "type": { "type": "string", "enum": ["entry", "exit"], "description": "Type of movement" },
+        "quantity": { "type": "number", "description": "Quantity moved" },
+        "unitPrice": { "type": "number", "description": "Unit price at the time of transaction" },
+        "stockId": { "type": "string", "description": "ID of the stock unit" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Time of transaction" },
+        "createdBy": { "type": "string", "description": "UID of the user who performed the transaction" }
+      },
+      "required": ["partId", "partName", "type", "quantity", "unitPrice", "stockId", "timestamp", "createdBy"]
+    },
+    "User": {
+      "title": "User Profile",
+      "description": "User information and roles",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"], "description": "User role" },
+        "permissions": {
+          "type": "object",
+          "properties": {
+            "canManageStocks": { "type": "boolean" },
+            "canManageParts": { "type": "boolean" },
+            "canViewHistory": { "type": "boolean" },
+            "canPerformTransactions": { "type": "boolean" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "role", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/stocks/{stockId}": {
+      "schema": "Stock",
+      "description": "Collection of stock units/locations"
+    },
+    "/parts/{partId}": {
+      "schema": "Part",
+      "description": "Collection of inventory parts"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "History of all stock movements"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles and permissions"
+    }
+  }
+}

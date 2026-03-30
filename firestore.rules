@@ -1,0 +1,125 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: stocks
+    // Fields:
+    //   - name: string (required)
+    //   - createdAt: timestamp (required)
+    //   - createdBy: string (required)
+    //
+    // Collection: parts
+    // Fields:
+    //   - name: string (required)
+    //   - model: string (required)
+    //   - quantity: number (required, >= 0)
+    //   - unitPrice: number (required, >= 0)
+    //   - totalValue: number (required, quantity * unitPrice)
+    //   - stockId: string (required)
+    //   - updatedAt: timestamp (required)
+    //   - createdBy: string (required, user UID)
+    //
+    // Collection: transactions
+    // Fields:
+    //   - partId: string (required)
+    //   - partName: string (required)
+    //   - type: string (required, 'entry' | 'exit')
+    //   - quantity: number (required, > 0)
+    //   - unitPrice: number (required, >= 0)
+    //   - stockId: string (required)
+    //   - timestamp: timestamp (required)
+    //   - createdBy: string (required, user UID)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+          request.auth.token.email == "luiz.ferigato@okamed.com.br");
+    }
+
+    function hasPermission(permission) {
+      return isAuthenticated() && 
+        (isAdmin() || 
+         (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.permissions[permission] == true));
+    }
+
+    function isValidStock(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.createdAt == request.time &&
+             data.createdBy is string && data.createdBy == request.auth.uid;
+    }
+
+    function isValidPart(data) {
+      return data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.model is string && data.model.size() > 0 && data.model.size() < 100 &&
+             data.quantity is number && data.quantity >= 0 &&
+             data.unitPrice is number && data.unitPrice >= 0 &&
+             data.totalValue is number && data.totalValue >= 0 &&
+             data.stockId is string &&
+             data.updatedAt == request.time &&
+             data.createdBy is string && data.createdBy == request.auth.uid;
+    }
+
+    function isValidTransaction(data) {
+      return data.partId is string &&
+             data.partName is string &&
+             data.type in ['entry', 'exit'] &&
+             data.quantity is number && data.quantity > 0 &&
+             data.unitPrice is number && data.unitPrice >= 0 &&
+             data.stockId is string &&
+             data.timestamp == request.time &&
+             data.createdBy is string && data.createdBy == request.auth.uid;
+    }
+
+    function isValidUser(data) {
+      return data.email is string &&
+             data.displayName is string &&
+             data.photoURL is string &&
+             data.role in ['admin', 'user'] &&
+             (data.permissions is map || !('permissions' in data));
+    }
+
+    match /stocks/{stockId} {
+      allow read: if isAuthenticated();
+      allow create: if hasPermission('canManageStocks') && isValidStock(request.resource.data);
+      allow update: if hasPermission('canManageStocks') && isValidStock(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /parts/{partId} {
+      allow read: if isAuthenticated();
+      allow create: if hasPermission('canManageParts') && isValidPart(request.resource.data);
+      allow update: if (hasPermission('canManageParts') || hasPermission('canPerformTransactions')) && isValidPart(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if hasPermission('canViewHistory');
+      allow create: if hasPermission('canPerformTransactions') && isValidTransaction(request.resource.data);
+      allow update: if false; // Transactions are immutable history
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && (request.resource.data.role == 'user' || isAdmin());
+      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role && request.resource.data.permissions == resource.data.permissions) || isAdmin();
+      allow delete: if isAdmin();
+    }
+  }
+}

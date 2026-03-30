@@ -1,0 +1,5 @@
+{
+  "name": "Sistema de Estoque Online",
+  "description": "Um sistema completo para gestão de estoque, permitindo controle de entrada e saída de peças, modelos, quantidades e valores.",
+  "requestFramePermissions": []
+}
